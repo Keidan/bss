@@ -1,0 +1,9 @@
+bin
+*~
+Makefile
+CMakeFiles
+CMakeCache*
+cmake_*
+#*
+.#*
+doc
