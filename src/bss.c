@@ -140,6 +140,7 @@ static void bss_sig_catch(int s) {
 }
 
 static void bss_cleanup(void) {
+  log_close();
   if(dump) fclose(dump), dump = NULL;
   if(osr) sr_close(osr), osr = NULL;
   if(isr) sr_close(isr), isr = NULL;
