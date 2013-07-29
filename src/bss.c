@@ -30,16 +30,21 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
+#include <unistd.h>
 #include <tk/text/string.h>
 #include <tk/text/stringtoken.h>
 #include <tk/io/sr.h>
 #include <tk/sys/log.h>
 #include <tk/io/net/netutils.h>
 
+#define MAX_CMD_SIZE 255
+
 static FILE* dump = NULL;
 static sr_t isr = NULL;
 static sr_t osr = NULL;
 static _Bool raw = 0;
+static _Bool hexa = 0;
+static char cmd[MAX_CMD_SIZE];
 
 static const struct option long_options[] = { 
     { "help"   , 0, NULL, 'h' },
@@ -47,6 +52,8 @@ static const struct option long_options[] = {
     { "output" , 1, NULL, 'o' },
     { "dump"   , 1, NULL, 'd' },
     { "raw"    , 0, NULL, 'r' },
+    { "command", 1, NULL, 'c' },
+    { "hexa"   , 0, NULL, '0' },
     { NULL     , 0, NULL, 0   } 
 };
 
@@ -58,7 +65,7 @@ static const struct option long_options[] = {
 
 static void bss_sig_catch(int s);
 static void bss_cleanup(void);
-static void bss_sr_read(sr_t sr, char* buffer, uint32_t length);
+static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length);
 
 void usage(int err) {
   fprintf(stdout, "usage: bss options\n");
@@ -74,6 +81,9 @@ void usage(int err) {
   fprintf(stdout, "\t\tSee the input mode description for the format pattern.\n");
   fprintf(stdout, "\t--dump, -d: Dump input datas in a scpecified file (eg: -d file).\n");
   fprintf(stdout, "\t--raw, -r: Dump all datas in raw mode.\n");
+  fprintf(stdout, "\t--command, -c: Input command.\n");
+  fprintf(stdout, "\t--hexa: Input command in hexa (by 2, eg for -c '00 00 10').\n");
+
   exit(err);
 }
 
@@ -81,8 +91,9 @@ void usage(int err) {
 int main(int argc, char** argv) {
   struct sigaction sa;
 
-
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
+
+  memset(cmd, 0, MAX_CMD_SIZE);
 
   atexit(bss_cleanup);
   memset(&sa, 0, sizeof(struct sigaction));
@@ -91,7 +102,7 @@ int main(int argc, char** argv) {
   (void)sigaction(SIGTERM, &sa, NULL);
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "hi:o:d:r", long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0", long_options, NULL)) != -1) {
     switch (opt) {
       case 'h': usage(0); break;
       case 'i': /* input */
@@ -113,6 +124,12 @@ int main(int argc, char** argv) {
 	  usage(EXIT_FAILURE);
 	}
 	break;
+      case '0': /* hexa */
+	hexa = 1;
+	break;
+      case 'c': /* command */
+	strncpy(cmd, optarg, MAX_CMD_SIZE);
+	break;
       case 'r': /* raw */
 	raw = 1;
 	break;
@@ -127,9 +144,30 @@ int main(int argc, char** argv) {
     blogger("Input mode is mandatory!\n");
     usage(EXIT_FAILURE);
   }
-
+  string_t buf;
+  sr_get_info(isr, buf);
+  blogger("%s\n", buf);
   sr_start_read(isr, bss_sr_read);
 
+  if(strlen(cmd)) {
+    if(!hexa)
+      sr_write(isr, cmd, strlen(cmd));
+    else {
+      int n = 0;
+      unsigned char full_cmd[MAX_CMD_SIZE+1];
+      bzero(full_cmd, MAX_CMD_SIZE);
+      stringtoken_t tok = stringtoken_init(cmd, " ");
+      while(stringtoken_has_more_tokens(tok)) {
+	char* c = stringtoken_next_token(tok);
+	full_cmd[n++] = (unsigned char)strtol(c, NULL, 16);
+      }
+      printf("Send trame (%d bytes):\n", n);
+      netutils_print_hex(stdout, full_cmd, n, 0);
+      stringtoken_release(tok);
+      sr_write(isr, full_cmd, n);
+    }
+  }
+  while(1) sleep(1);
   return EXIT_SUCCESS;
 }
 
@@ -146,7 +184,7 @@ static void bss_cleanup(void) {
   if(isr) sr_close(isr), isr = NULL;
 }
 
-static void bss_sr_read(sr_t sr, char* buffer, uint32_t length) {
+static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
   netutils_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
   /* forward this data */
   if(osr) sr_write(osr, buffer, length);
