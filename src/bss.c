@@ -147,6 +147,7 @@ int main(int argc, char** argv) {
   string_t buf;
   sr_get_info(isr, buf);
   blogger("%s\n", buf);
+
   sr_start_read(isr, bss_sr_read);
 
   if(strlen(cmd)) {
@@ -167,6 +168,7 @@ int main(int argc, char** argv) {
       sr_write(isr, full_cmd, n);
     }
   }
+
   while(1) sleep(1);
   return EXIT_SUCCESS;
 }
@@ -185,6 +187,7 @@ static void bss_cleanup(void) {
 }
 
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
+  printf("Buffer size: %d\n", length);
   netutils_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
   /* forward this data */
   if(osr) sr_write(osr, buffer, length);
