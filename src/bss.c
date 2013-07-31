@@ -70,13 +70,15 @@ static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length);
 void usage(int err) {
   fprintf(stdout, "usage: bss options\n");
   fprintf(stdout, "\t--help, -h: Print this help.\n");
-  fprintf(stdout, "\t--input, -i: Input mode and config: dev=device:b=baud:d=data_bits:s=stop_bits:c=flowcontrol:p=parity\n");
+  fprintf(stdout, "\t--input, -i: Input mode and config: dev=device:b=baud:d=data_bits:s=stop_bits:c=flowcontrol:p=parity:v=vmin:t=vtime\n");
   fprintf(stdout, "\t\t dev: serial device (eg: dev=/dev/ttyS0).\n");
   fprintf(stdout, "\t\t b: Nb bauds (eg: b=9600).\n");
   fprintf(stdout, "\t\t d: Data bits, possible values: 5, 6, 7 or 8 (eg: d=8).\n");
   fprintf(stdout, "\t\t s: Stop bits, possible values: 1 or 2 (eg: s=1).\n");
   fprintf(stdout, "\t\t c: Flow control, possible values: none, xonxoff or rtscts (eg: c:none).\n");
   fprintf(stdout, "\t\t p: Parity, possible values: none,odd or even (eg: p=none).\n");
+  fprintf(stdout, "\t\t v: vmin, 0 <= value <= 254.\n");
+  fprintf(stdout, "\t\t t: vtime, 0 <= value <= 254 (in 0.1 sec).\n");
   fprintf(stdout, "\t--output, -o: This mode reinjects all input data into a new device.\n");
   fprintf(stdout, "\t\tSee the input mode description for the format pattern.\n");
   fprintf(stdout, "\t--dump, -d: Dump input datas in a scpecified file (eg: -d file).\n");
