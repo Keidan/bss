@@ -93,6 +93,7 @@ void usage(int err) {
 int main(int argc, char** argv) {
   struct sigaction sa;
 
+  log_init("bss", LOG_PID, LOG_USER);
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
 
   memset(cmd, 0, MAX_CMD_SIZE);
@@ -182,10 +183,10 @@ static void bss_sig_catch(int s) {
 }
 
 static void bss_cleanup(void) {
-  log_close();
   if(dump) fclose(dump), dump = NULL;
   if(osr) sr_close(osr), osr = NULL;
   if(isr) sr_close(isr), isr = NULL;
+  log_close();
 }
 
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
