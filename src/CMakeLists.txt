@@ -11,4 +11,4 @@ set(bin_src
   ${BSS_SRC_DIR}/bss.c 
 )
 add_executable(bss ${bin_src})
-target_link_libraries(bss tk)
+target_link_libraries(bss tk zlib-minizip)

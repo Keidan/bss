@@ -67,11 +67,10 @@ else()
   message(FATAL_ERROR "Invalid usage please use: cmake -DCMAKE_BUILD_TYPE=[x86|x86_64|xscale]")
 endif()
 
-
+link_directories("${CMAKE_SOURCE_DIR}/lib/tk/lib/${DISTRIBUTION}/${CMAKE_BUILD_TYPE}")
 set(BSS_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin/${DISTRIBUTION}/${CMAKE_BUILD_TYPE})
 file(MAKE_DIRECTORY ${BSS_BINARY_DIR})
 set(EXECUTABLE_OUTPUT_PATH ${BSS_BINARY_DIR})
-link_directories("${CMAKE_SOURCE_DIR}/lib/tk/lib/${DISTRIBUTION}/${CMAKE_BUILD_TYPE}")
 
 add_subdirectory(${BSS_SRC_DIR})
 
