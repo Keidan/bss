@@ -36,6 +36,7 @@
 #include <tk/io/sr.h>
 #include <tk/sys/log.h>
 #include <tk/io/net/netutils.h>
+#include <tk/sys/sysutils.h>
 
 #define MAX_CMD_SIZE 255
 
@@ -63,7 +64,6 @@ static const struct option long_options[] = {
     fprintf(stderr, __VA_ARGS__);		\
   })
 
-static void bss_sig_catch(int s);
 static void bss_cleanup(void);
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length);
 
@@ -91,18 +91,12 @@ void usage(int err) {
 
 
 int main(int argc, char** argv) {
-  struct sigaction sa;
 
-  log_init("bss", LOG_PID, LOG_USER);
+  sysutils_exit_action(log_init_cast("bss", LOG_PID, LOG_USER), bss_cleanup);
+
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
 
   memset(cmd, 0, MAX_CMD_SIZE);
-
-  atexit(bss_cleanup);
-  memset(&sa, 0, sizeof(struct sigaction));
-  sa.sa_handler = bss_sig_catch;
-  (void)sigaction(SIGINT, &sa, NULL);
-  (void)sigaction(SIGTERM, &sa, NULL);
 
   int opt;
   while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0", long_options, NULL)) != -1) {
@@ -174,12 +168,6 @@ int main(int argc, char** argv) {
 
   while(1) sleep(1);
   return EXIT_SUCCESS;
-}
-
-
-static void bss_sig_catch(int s) {
-  printf("\n"); /* skip the ^C on the console... */
-  exit(0); /* call atexit */
 }
 
 static void bss_cleanup(void) {
