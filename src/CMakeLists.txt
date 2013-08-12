@@ -1,9 +1,8 @@
-
 # configure a header file to pass some of the CMake settings
 # to the source code
 configure_file (
   "bss_config.h.in"
-  "bss_config.h"
+  "src/bss_config.h"
 )
 
 
