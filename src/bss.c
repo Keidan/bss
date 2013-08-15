@@ -36,7 +36,7 @@
 #include <tk/io/sr.h>
 #include <tk/sys/log.h>
 #include <tk/io/net/netutils.h>
-#include <tk/sys/sysutils.h>
+#include <tk/sys/syssig.h>
 
 #define MAX_CMD_SIZE 255
 
@@ -65,6 +65,7 @@ static const struct option long_options[] = {
   })
 
 static void bss_cleanup(void);
+static void bss_signals(int sig);
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length);
 
 void usage(int err) {
@@ -92,9 +93,11 @@ void usage(int err) {
 
 int main(int argc, char** argv) {
 
-  sysutils_exit_action(log_init_cast("bss", LOG_PID, LOG_USER), bss_cleanup);
-
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
+
+  syssig_init(log_init_cast_user("bss", LOG_PID), bss_cleanup);
+  syssig_add_signal(SIGINT, bss_signals);
+  syssig_add_signal(SIGTERM, bss_signals);
 
   memset(cmd, 0, MAX_CMD_SIZE);
 
@@ -170,11 +173,17 @@ int main(int argc, char** argv) {
   return EXIT_SUCCESS;
 }
 
+
+static void bss_signals(int sig) {
+  if(sig == SIGINT)
+    printf("\n"); // for ^C
+  exit(0);
+}
+
 static void bss_cleanup(void) {
   if(dump) fclose(dump), dump = NULL;
   if(osr) sr_close(osr), osr = NULL;
   if(isr) sr_close(isr), isr = NULL;
-  log_close();
 }
 
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
