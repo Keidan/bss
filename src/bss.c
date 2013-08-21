@@ -35,8 +35,8 @@
 #include <tk/text/stringtoken.h>
 #include <tk/io/sr.h>
 #include <tk/sys/log.h>
-#include <tk/io/net/netutils.h>
-#include <tk/sys/syssig.h>
+#include <tk/io/net/ntools.h>
+#include <tk/sys/ssig.h>
 
 #define MAX_CMD_SIZE 255
 
@@ -95,9 +95,9 @@ int main(int argc, char** argv) {
 
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
 
-  syssig_init(log_init_cast_user("bss", LOG_PID), bss_cleanup);
-  syssig_add_signal(SIGINT, bss_signals);
-  syssig_add_signal(SIGTERM, bss_signals);
+  ssig_init(log_init_cast_user("bss", LOG_PID), bss_cleanup);
+  ssig_add_signal(SIGINT, bss_signals);
+  ssig_add_signal(SIGTERM, bss_signals);
 
   memset(cmd, 0, MAX_CMD_SIZE);
 
@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
 	full_cmd[n++] = (unsigned char)strtol(c, NULL, 16);
       }
       printf("Send trame (%d bytes):\n", n);
-      netutils_print_hex(stdout, full_cmd, n, 0);
+      ntools_print_hex(stdout, full_cmd, n, 0);
       stringtoken_release(tok);
       sr_write(isr, full_cmd, n);
     }
@@ -188,7 +188,7 @@ static void bss_cleanup(void) {
 
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
   printf("Buffer size: %d\n", length);
-  netutils_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
+  ntools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
   /* forward this data */
   if(osr) sr_write(osr, buffer, length);
 }
