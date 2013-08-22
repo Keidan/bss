@@ -30,7 +30,7 @@ add_custom_target(doxygen
 )
 # The version number.
 set (BSS_VERSION_MAJOR 1)
-set (BSS_VERSION_MINOR 5)
+set (BSS_VERSION_MINOR 6)
 
 # To produce x86_64 binaries
 if("${CMAKE_BUILD_TYPE}" MATCHES "x86_64")
@@ -67,10 +67,16 @@ else()
   message(FATAL_ERROR "Invalid usage please use: cmake -DCMAKE_BUILD_TYPE=[x86|x86_64|xscale]")
 endif()
 
-link_directories("${CMAKE_SOURCE_DIR}/lib/tk/lib/${DISTRIBUTION}/${CMAKE_BUILD_TYPE}")
+set(TK_LIB_DIR "${CMAKE_SOURCE_DIR}/lib/tk/lib/${DISTRIBUTION}/${CMAKE_BUILD_TYPE}")
+link_directories("${TK_LIB_DIR}")
 set(BSS_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin/${DISTRIBUTION}/${CMAKE_BUILD_TYPE})
 file(MAKE_DIRECTORY ${BSS_BINARY_DIR})
 set(EXECUTABLE_OUTPUT_PATH ${BSS_BINARY_DIR})
+
+
+add_custom_target(install
+   COMMAND ${CMAKE_COMMAND} -DLIBRARIES="${TK_LIB_DIR}" -DBINARIES="${EXECUTABLE_OUTPUT_PATH}" -DNAME="bss-${DISTRIBUTION}-${CMAKE_BUILD_TYPE}" -P cmake/install.cmake
+)
 
 add_subdirectory(${BSS_SRC_DIR})
 
