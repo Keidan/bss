@@ -39,6 +39,7 @@ static _Bool raw = 0;
 static _Bool hexa = 0;
 static _Bool snd = 0;
 static _Bool rcv = 0;
+static _Bool frames_rewind = 0;
 static stringbuffer_t cmd = NULL;
 struct bss_frames_counter_s cframes;
 
@@ -53,6 +54,7 @@ static const struct option long_options[] = {
     { "simul"  , 1, NULL, 's' },
     { "snd"    , 0, NULL, '1' },
     { "rcv"    , 0, NULL, '2' },
+    { "rewind" , 0, NULL, '3' },
     { NULL     , 0, NULL, 0   } 
 };
 
@@ -81,12 +83,14 @@ void usage(int err) {
   fprintf(stdout, "\t\t p: Parity, possible values: none,odd or even (eg: p=none).\n");
   fprintf(stdout, "\t\t v: vmin, 0 <= value <= 254.\n");
   fprintf(stdout, "\t\t t: vtime, 0 <= value <= 254 (in 0.1 sec).\n");
-  fprintf(stdout, "\t--output, -o: This mode reinjects all input data into a new device.\n");
-  fprintf(stdout, "\t\tSee the input mode description for the format pattern.\n");
   fprintf(stdout, "\t--dump, -d: Dump input datas in a scpecified file (eg: -d file).\n");
   fprintf(stdout, "\t--raw, -r: Dump all datas in raw mode.\n");
+  fprintf(stdout, "\t----------------\n");
+  fprintf(stdout, "\t--output, -o: This mode reinjects all input data into a new device.\n");
+  fprintf(stdout, "\t\tSee the input mode description for the format pattern.\n");
   fprintf(stdout, "\t--command, -c: Input command.\n");
   fprintf(stdout, "\t--hexa: Input command in hexa (by 2, eg for -c '00 00 10').\n");
+  fprintf(stdout, "\t----------------\n");
   fprintf(stdout, "\t--simu, -s: Simulation file.\n");
   fprintf(stdout, "\t\tFile format (sender frame AND receiver frame)\n");
   fprintf(stdout, "\t\t%s\\n\n", SND_TAG);
@@ -95,6 +99,7 @@ void usage(int err) {
   fprintf(stdout, "\t\thexa (xx[space]xx...) datas\n");
   fprintf(stdout, "\t--snd: Sender mode (see --simul,-s).\n");    
   fprintf(stdout, "\t--rcv: Receiver mode (see --simul,-s).\n");
+  fprintf(stdout, "\t--rewind: Rewind the simul process if the max frame is reached. (see --simul,-s).\n");
   exit(err);
 }
 
@@ -110,7 +115,7 @@ int main(int argc, char** argv) {
   cmd = stringbuffer_new();
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0s:12", long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0s:123", long_options, NULL)) != -1) {
     switch (opt) {
       case 'h': usage(0); break;
       case 'i': /* input */
@@ -149,11 +154,14 @@ int main(int argc, char** argv) {
 	}
 	simul_mode = 1;
 	break;
-      case '1':
+      case '1': /* snd */
 	snd = 1;
 	break;
-      case '2':
+      case '2': /* rcv */
 	rcv = 1;
+	break;
+      case '3': /* rewind */
+	frames_rewind = 1;
 	break;
       default: /* '?' */
 	logger(LOG_ERR, "Unknown option '%c'\n", opt);
@@ -214,14 +222,20 @@ static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
   ntools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
   if(simul_mode) {
     if(snd) {
-      if(cframes.cur_snd < cframes.max_snd)
-	bss_utils_send_table_frame(isr, tsnd, &cframes.cur_snd);
-      else printf("Max snd frames reached.\n");
+      if(cframes.cur_snd >= cframes.max_snd) {
+	printf("Max snd frames reached, rewind mode %s.\n", frames_rewind ? "set" : "not set");
+	if(frames_rewind) cframes.cur_snd = 0;
+	else return;
+      }
+      bss_utils_send_table_frame(isr, tsnd, &cframes.cur_snd);
     }
     else {
-      if(cframes.cur_rcv < cframes.max_rcv)
-	bss_utils_send_table_frame(isr, trcv, &cframes.cur_rcv);
-      else printf("Max rcv frames reached.\n");
+      if(cframes.cur_rcv >= cframes.max_rcv) {
+	printf("Max rcv frames reached, rewind mode %s.\n", frames_rewind ? "set" : "not set");
+	if(frames_rewind) cframes.cur_rcv = 0;
+	else return;
+      }
+      bss_utils_send_table_frame(isr, trcv, &cframes.cur_rcv);
     }
   } else {
     /* forward this data */
