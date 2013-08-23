@@ -32,7 +32,7 @@
 void bss_urils_send_frame(sr_t isr, char* cmd) {
   uint32_t n;
   unsigned char* buffer = bss_utils_hex_to_buffer_c(cmd, &n);
-  printf("Send trame (%d bytes):\n", n);
+  printf("Send frame (%d bytes):\n", n);
   ntools_print_hex(stdout, buffer, n, 0);
   sr_write(isr, buffer, n);
   free(buffer);
@@ -46,8 +46,6 @@ void bss_urils_send_frame(sr_t isr, char* cmd) {
  * @param tidx Table key.
  */
 void bss_utils_send_table_frame(sr_t isr, htable_t t, uint32_t *tidx) {
-  printf("tidx:%d\n", *tidx);
-  printf("tidx:%d, %s\n", *tidx, string_convert((*tidx), 10));
   char* cmd = (char*)htable_lookup(t, (char*)string_convert(*tidx, 10));
   if(!cmd) {
     logger(LOG_ERR, "Null frame cmd\n");
@@ -58,16 +56,18 @@ void bss_utils_send_table_frame(sr_t isr, htable_t t, uint32_t *tidx) {
 }
 
 /**
- * @fn void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv)
+ * @fn void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv, struct bss_frames_counter_s* counter)
  * @brief Parse the silul file.
  * @param simul The simul file.
  * @param tsnd SND table.
  * @param trcv RCV table.
+ * @param counter Frames counter.
  */
-void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv) {
+void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv, struct bss_frames_counter_s* counter) {
   _Bool stag = 0, rtag = 0, add = 0;
   char* line = NULL;
-  size_t sz = 0, llen, nrframe = 0, nsframe = 0, *idx;
+  size_t sz = 0, llen, *idx;
+  memset(counter, 0, sizeof(struct bss_frames_counter_s));
   stringbuffer_t buffer = stringbuffer_new();
   htable_t tmp = NULL;
   if(!*tsnd) {
@@ -88,7 +88,7 @@ void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv) {
       if(stringbuffer_length(buffer)) {
 	add=1;
 	tmp=*trcv;
-	idx=&nrframe;
+	idx=&counter->max_rcv;
       } else continue;
     } else if(!strcmp(RCV_TAG" ", line)) {
       rtag = 1;
@@ -96,7 +96,7 @@ void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv) {
       if(stringbuffer_length(buffer)) {
 	add=1;
 	tmp=*tsnd;
-	idx=&nsframe;
+	idx=&counter->max_snd;
       } else continue;
     }
     if(add) {
@@ -110,14 +110,14 @@ void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv) {
   }
   if(stringbuffer_length(buffer)) {
     htable_t tmp = *tsnd;
-    uint32_t idx = nsframe;
+    idx = &counter->max_snd;
     if(rtag) {
       tmp = *trcv;
-      idx = nrframe;
+      idx = &counter->max_rcv;
     }
-    htable_add(tmp, (char*)string_convert(idx, 10), stringbuffer_to_str(buffer), stringbuffer_length(buffer));
-    idx++;
-    stringbuffer_erase2(buffer, 0);
+    htable_add(tmp, (char*)string_convert(*idx, 10), stringbuffer_to_str(buffer), stringbuffer_length(buffer));
+    (*idx)++;
+    stringbuffer_clear(buffer);
   }
   if(line) free(line);
   fclose(*simul), *simul = NULL;

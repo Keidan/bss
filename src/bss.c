@@ -40,8 +40,7 @@ static _Bool hexa = 0;
 static _Bool snd = 0;
 static _Bool rcv = 0;
 static stringbuffer_t cmd = NULL;
-uint32_t sframe = 0;
-uint32_t rframe = 0;
+struct bss_frames_counter_s cframes;
 
 static const struct option long_options[] = { 
     { "help"   , 0, NULL, 'h' },
@@ -88,12 +87,12 @@ void usage(int err) {
   fprintf(stdout, "\t--raw, -r: Dump all datas in raw mode.\n");
   fprintf(stdout, "\t--command, -c: Input command.\n");
   fprintf(stdout, "\t--hexa: Input command in hexa (by 2, eg for -c '00 00 10').\n");
-  fprintf(stdout, "\t--simu, -s: Simulation file (use --hexa for hexa datas).\n");
+  fprintf(stdout, "\t--simu, -s: Simulation file.\n");
   fprintf(stdout, "\t\tFile format (sender frame AND receiver frame)\n");
   fprintf(stdout, "\t\t%s\\n\n", SND_TAG);
-  fprintf(stdout, "\t\tbinary or hexa (xx[space]xx...) datas\n");
+  fprintf(stdout, "\t\thexa (xx[space]xx...) datas\n");
   fprintf(stdout, "\t\t%s\\n\n", RCV_TAG);
-  fprintf(stdout, "\t\tbinary or hexa (xx[space]xx...) datas\n");
+  fprintf(stdout, "\t\thexa (xx[space]xx...) datas\n");
   fprintf(stdout, "\t--snd: Sender mode (see --simul,-s).\n");    
   fprintf(stdout, "\t--rcv: Receiver mode (see --simul,-s).\n");
   exit(err);
@@ -193,9 +192,9 @@ int main(int argc, char** argv) {
     else
       bss_urils_send_frame(isr, stringbuffer_to_str(cmd));
   } else if(simul_mode) {
-    bss_utils_parse_simul(&simul, &tsnd, &trcv);
+    bss_utils_parse_simul(&simul, &tsnd, &trcv, &cframes);
     if(snd)
-      bss_utils_send_table_frame(isr, tsnd, &sframe);
+      bss_utils_send_table_frame(isr, tsnd, &cframes.cur_snd);
   }
 
   while(1) sleep(1);
@@ -214,10 +213,16 @@ static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
   printf("Buffer size: %d\n", length);
   ntools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
   if(simul_mode) {
-    if(snd)
-      bss_utils_send_table_frame(isr, tsnd, &sframe);
-    else
-      bss_utils_send_table_frame(isr, trcv, &rframe);
+    if(snd) {
+      if(cframes.cur_snd < cframes.max_snd)
+	bss_utils_send_table_frame(isr, tsnd, &cframes.cur_snd);
+      else printf("Max snd frames reached.\n");
+    }
+    else {
+      if(cframes.cur_rcv < cframes.max_rcv)
+	bss_utils_send_table_frame(isr, trcv, &cframes.cur_rcv);
+      else printf("Max rcv frames reached.\n");
+    }
   } else {
     /* forward this data */
     if(osr) sr_write(osr, buffer, length);

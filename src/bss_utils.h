@@ -38,6 +38,13 @@
   #define SND_TAG "--[SND]--"
   #define RCV_TAG "--[RCV]--"
 
+  struct bss_frames_counter_s {
+      uint32_t max_rcv;
+      uint32_t max_snd;
+      uint32_t cur_rcv;
+      uint32_t cur_snd;
+  };
+
   /**
    * @fn unsigned char* bss_utils_hex_to_buffer(const stringbuffer_t input)
    * @brief Convert input hex string in binary datas.
@@ -57,13 +64,14 @@
   unsigned char* bss_utils_hex_to_buffer_c(const char* input, uint32_t *alen);
 
   /**
-   * @fn void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv)
+   * @fn void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv, struct bss_frames_counter_s* counter)
    * @brief Parse the silul file.
    * @param simul The simul file.
    * @param tsnd SND table.
    * @param trcv RCV table.
+   * @param counter Frames counter.
    */
-  void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv);
+  void bss_utils_parse_simul(FILE** simul, htable_t *tsnd, htable_t *trcv, struct bss_frames_counter_s* counter);
 
   /**
    * @fn void bss_send_first_frame(sr_t isr, htable_t t, uint32_t *tidx)
