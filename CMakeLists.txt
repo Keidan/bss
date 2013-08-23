@@ -74,8 +74,8 @@ file(MAKE_DIRECTORY ${BSS_BINARY_DIR})
 set(EXECUTABLE_OUTPUT_PATH ${BSS_BINARY_DIR})
 
 
-add_custom_target(install
-   COMMAND ${CMAKE_COMMAND} -DLIBRARIES="${TK_LIB_DIR}" -DBINARIES="${EXECUTABLE_OUTPUT_PATH}" -DNAME="bss-${DISTRIBUTION}-${CMAKE_BUILD_TYPE}" -P cmake/install.cmake
+add_custom_target(package
+   COMMAND ${CMAKE_COMMAND} -DLIBRARIES="${TK_LIB_DIR}" -DBINARIES="${EXECUTABLE_OUTPUT_PATH}" -DNAME="bss-${DISTRIBUTION}-${CMAKE_BUILD_TYPE}" -P cmake/package.cmake
 )
 
 add_subdirectory(${BSS_SRC_DIR})
