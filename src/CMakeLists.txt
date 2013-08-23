@@ -2,11 +2,12 @@
 # to the source code
 configure_file (
   "bss_config.h.in"
-  "src/bss_config.h"
+  "bss_config.h"
 )
 
 
 set(bin_src 
+  ${BSS_SRC_DIR}/bss_utils.c 
   ${BSS_SRC_DIR}/bss.c 
 )
 add_executable(bss ${bin_src})

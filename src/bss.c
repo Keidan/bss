@@ -23,29 +23,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bss_config.h"
+#include "bss_utils.h"
 #include <getopt.h>
-#include <limits.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <errno.h>
 #include <unistd.h>
-#include <tk/text/string.h>
-#include <tk/text/stringtoken.h>
-#include <tk/io/sr.h>
-#include <tk/sys/log.h>
-#include <tk/io/net/ntools.h>
-#include <tk/sys/ssig.h>
+#include <errno.h>
 
-#define MAX_CMD_SIZE 255
-
+static htable_t tsnd = NULL;
+static htable_t trcv = NULL;
 static FILE* dump = NULL;
+static _Bool simul_mode = 0;
+static FILE* simul = NULL;
 static sr_t isr = NULL;
 static sr_t osr = NULL;
 static _Bool raw = 0;
 static _Bool hexa = 0;
-static char cmd[MAX_CMD_SIZE];
+static _Bool snd = 0;
+static _Bool rcv = 0;
+static stringbuffer_t cmd = NULL;
+uint32_t sframe = 0;
+uint32_t rframe = 0;
 
 static const struct option long_options[] = { 
     { "help"   , 0, NULL, 'h' },
@@ -55,18 +51,24 @@ static const struct option long_options[] = {
     { "raw"    , 0, NULL, 'r' },
     { "command", 1, NULL, 'c' },
     { "hexa"   , 0, NULL, '0' },
+    { "simul"  , 1, NULL, 's' },
+    { "snd"    , 0, NULL, '1' },
+    { "rcv"    , 0, NULL, '2' },
     { NULL     , 0, NULL, 0   } 
 };
 
   
-#define blogger(...) ({				\
-    logger(LOG_ERR, __VA_ARGS__);		\
-    fprintf(stderr, __VA_ARGS__);		\
-  })
-
 static void bss_cleanup(void);
 static void bss_signals(int sig);
+/**
+ * @fn static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length)
+ * @brief Serial callback.
+ * @param sr Serial instance.
+ * @param buffer input buffer.
+ * @param length input length.
+ */
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length);
+
 
 void usage(int err) {
   fprintf(stdout, "usage: bss options\n");
@@ -86,7 +88,14 @@ void usage(int err) {
   fprintf(stdout, "\t--raw, -r: Dump all datas in raw mode.\n");
   fprintf(stdout, "\t--command, -c: Input command.\n");
   fprintf(stdout, "\t--hexa: Input command in hexa (by 2, eg for -c '00 00 10').\n");
-
+  fprintf(stdout, "\t--simu, -s: Simulation file (use --hexa for hexa datas).\n");
+  fprintf(stdout, "\t\tFile format (sender frame AND receiver frame)\n");
+  fprintf(stdout, "\t\t%s\\n\n", SND_TAG);
+  fprintf(stdout, "\t\tbinary or hexa (xx[space]xx...) datas\n");
+  fprintf(stdout, "\t\t%s\\n\n", RCV_TAG);
+  fprintf(stdout, "\t\tbinary or hexa (xx[space]xx...) datas\n");
+  fprintf(stdout, "\t--snd: Sender mode (see --simul,-s).\n");    
+  fprintf(stdout, "\t--rcv: Receiver mode (see --simul,-s).\n");
   exit(err);
 }
 
@@ -95,32 +104,32 @@ int main(int argc, char** argv) {
 
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
 
-  ssig_init(log_init_cast_user("bss", LOG_PID), bss_cleanup);
+  ssig_init(log_init_cast_user("bss", LOG_PID|LOG_CONS|LOG_PERROR), bss_cleanup);
   ssig_add_signal(SIGINT, bss_signals);
   ssig_add_signal(SIGTERM, bss_signals);
 
-  memset(cmd, 0, MAX_CMD_SIZE);
+  cmd = stringbuffer_new();
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0", long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0s:12", long_options, NULL)) != -1) {
     switch (opt) {
       case 'h': usage(0); break;
       case 'i': /* input */
 	if((isr = sr_open_from_string(optarg)) == NULL) {
-	  blogger("Unable to open the input serial (see the log for more details)!\n");
+	  logger(LOG_ERR, "Unable to open the input serial (see the log for more details)!\n");
 	  usage(EXIT_FAILURE);
 	}
 	break;
       case 'o': /* output */
 	if((osr = sr_open_from_string(optarg)) == NULL) {
-	  blogger("Unable to open the output serial (see the log for more details)!\n");
+	  logger(LOG_ERR, "Unable to open the output serial (see the log for more details)!\n");
 	  usage(EXIT_FAILURE);
 	}
 	break;
       case 'd': /* dump */
 	dump = fopen(optarg, "w+");
 	if(!dump) {
-	  blogger("Unable to open file '%s': (%d) %s\n", optarg, errno, strerror(errno));
+	  logger(LOG_ERR, "Unable to open file '%s': (%d) %s\n", optarg, errno, strerror(errno));
 	  usage(EXIT_FAILURE);
 	}
 	break;
@@ -128,51 +137,92 @@ int main(int argc, char** argv) {
 	hexa = 1;
 	break;
       case 'c': /* command */
-	strncpy(cmd, optarg, MAX_CMD_SIZE);
+	stringbuffer_copy(cmd, optarg);
 	break;
       case 'r': /* raw */
 	raw = 1;
 	break;
+      case 's': /* simul */
+	simul = fopen(optarg, "r");
+	if(!simul) {
+	  logger(LOG_ERR, "Unable to open file '%s': (%d) %s\n", optarg, errno, strerror(errno));
+	  usage(EXIT_FAILURE);
+	}
+	simul_mode = 1;
+	break;
+      case '1':
+	snd = 1;
+	break;
+      case '2':
+	rcv = 1;
+	break;
       default: /* '?' */
-	blogger("Unknown option '%c'\n", opt);
+	logger(LOG_ERR, "Unknown option '%c'\n", opt);
 	usage(EXIT_FAILURE);
 	break;
     }
   }
 
   if(!isr) {
-    blogger("Input mode is mandatory!\n");
+    logger(LOG_ERR, "Input mode is mandatory!\n");
     usage(EXIT_FAILURE);
   }
+  if(simul_mode && rcv && snd) {
+    logger(LOG_ERR, "Invalid simul mode snd = 1 AND rcv = 1!");
+    usage(EXIT_FAILURE);
+  }else if(simul_mode && !rcv && !snd) {
+    logger(LOG_ERR, "Invalid simul mode snd = 0 AND rcv = 0!");
+    usage(EXIT_FAILURE);
+  } else if(simul_mode && osr) {
+    logger(LOG_ERR, "Invalid simul mode AND output mode!");
+    usage(EXIT_FAILURE);
+  } else if(simul_mode && stringbuffer_length(cmd)) {
+    logger(LOG_ERR, "Invalid simul mode AND non null command!");
+    usage(EXIT_FAILURE);
+  }
+
   string_t buf;
   sr_get_info(isr, buf);
-  blogger("%s\n", buf);
+  logger(LOG_INFO, "%s\n", buf);
 
   sr_start_read(isr, bss_sr_read);
 
-  if(strlen(cmd)) {
+  if(stringbuffer_length(cmd)) {
     if(!hexa)
-      sr_write(isr, cmd, strlen(cmd));
-    else {
-      int n = 0;
-      unsigned char full_cmd[MAX_CMD_SIZE+1];
-      bzero(full_cmd, MAX_CMD_SIZE);
-      stringtoken_t tok = stringtoken_init(cmd, " ");
-      while(stringtoken_has_more_tokens(tok)) {
-	char* c = stringtoken_next_token(tok);
-	full_cmd[n++] = (unsigned char)strtol(c, NULL, 16);
-      }
-      printf("Send trame (%d bytes):\n", n);
-      ntools_print_hex(stdout, full_cmd, n, 0);
-      stringtoken_release(tok);
-      sr_write(isr, full_cmd, n);
-    }
+      sr_write(isr, (unsigned char*)stringbuffer_to_str(cmd), stringbuffer_length(cmd));
+    else
+      bss_urils_send_frame(isr, stringbuffer_to_str(cmd));
+  } else if(simul_mode) {
+    bss_utils_parse_simul(&simul, &tsnd, &trcv);
+    if(snd)
+      bss_utils_send_table_frame(isr, tsnd, &sframe);
   }
 
   while(1) sleep(1);
   return EXIT_SUCCESS;
 }
 
+
+/**
+ * @fn static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length)
+ * @brief Serial callback.
+ * @param sr Serial instance.
+ * @param buffer input buffer.
+ * @param length input length.
+ */
+static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
+  printf("Buffer size: %d\n", length);
+  ntools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
+  if(simul_mode) {
+    if(snd)
+      bss_utils_send_table_frame(isr, tsnd, &sframe);
+    else
+      bss_utils_send_table_frame(isr, trcv, &rframe);
+  } else {
+    /* forward this data */
+    if(osr) sr_write(osr, buffer, length);
+  }
+}
 
 static void bss_signals(int sig) {
   if(sig == SIGINT)
@@ -184,11 +234,9 @@ static void bss_cleanup(void) {
   if(dump) fclose(dump), dump = NULL;
   if(osr) sr_close(osr), osr = NULL;
   if(isr) sr_close(isr), isr = NULL;
+  if(simul) fclose(simul), simul = NULL;
+  if(cmd) stringbuffer_delete(cmd), cmd = NULL;
+  if(tsnd) htable_delete(tsnd), tsnd = NULL;
+  if(trcv) htable_delete(trcv), trcv = NULL;
 }
 
-static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
-  printf("Buffer size: %d\n", length);
-  ntools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
-  /* forward this data */
-  if(osr) sr_write(osr, buffer, length);
-}
