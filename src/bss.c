@@ -108,9 +108,9 @@ int main(int argc, char** argv) {
 
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
 
-  ssig_init(log_init_cast_user("bss", LOG_PID|LOG_CONS|LOG_PERROR), bss_cleanup);
-  ssig_add_signal(SIGINT, bss_signals);
-  ssig_add_signal(SIGTERM, bss_signals);
+  syssig_init(log_init_cast_user("bss", LOG_PID|LOG_CONS|LOG_PERROR), bss_cleanup);
+  syssig_add_signal(SIGINT, bss_signals);
+  syssig_add_signal(SIGTERM, bss_signals);
 
   cmd = stringbuffer_new();
 
@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
  */
 static void bss_sr_read(sr_t sr, unsigned char* buffer, uint32_t length) {
   printf("Buffer size: %d\n", length);
-  ntools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
+  nettools_print_hex(dump == NULL ? stdout : dump, buffer, length, raw);
   if(simul_mode) {
     if(snd) {
       if(cframes.cur_snd >= cframes.max_snd) {

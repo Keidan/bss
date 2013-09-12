@@ -25,14 +25,14 @@
 
   #include <stdio.h>
   #include <stdlib.h>
-  #include <tk/text/string.h>
-  #include <tk/text/stringbuffer.h>
-  #include <tk/text/stringtoken.h>
+  #include <tk/utils/string.h>
+  #include <tk/utils/stringbuffer.h>
+  #include <tk/utils/stringtoken.h>
   #include <tk/io/sr.h>
   #include <tk/sys/log.h>
-  #include <tk/io/net/ntools.h>
-  #include <tk/sys/ssig.h>
-  #include <tk/collection/htable.h>
+  #include <tk/io/net/nettools.h>
+  #include <tk/sys/syssig.h>
+  #include <tk/utils/htable.h>
 
 
   #define SND_TAG "--[SND]--"

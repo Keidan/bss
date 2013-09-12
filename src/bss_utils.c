@@ -33,7 +33,7 @@ void bss_urils_send_frame(sr_t isr, char* cmd) {
   uint32_t n;
   unsigned char* buffer = bss_utils_hex_to_buffer_c(cmd, &n);
   printf("Send frame (%d bytes):\n", n);
-  ntools_print_hex(stdout, buffer, n, 0);
+  nettools_print_hex(stdout, buffer, n, 0);
   sr_write(isr, buffer, n);
   free(buffer);
 }
