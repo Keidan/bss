@@ -20,6 +20,7 @@
  *
  *******************************************************************************
  */
+#include <tk/io/file.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "bss_config.h"
@@ -55,6 +56,7 @@ static const struct option long_options[] = {
     { "snd"    , 0, NULL, '1' },
     { "rcv"    , 0, NULL, '2' },
     { "rewind" , 0, NULL, '3' },
+    { "file"   , 0, NULL, 'f' },
     { NULL     , 0, NULL, 0   } 
 };
 
@@ -89,6 +91,7 @@ void usage(int err) {
   fprintf(stdout, "\t--output, -o: This mode reinjects all input data into a new device.\n");
   fprintf(stdout, "\t\tSee the input mode description for the format pattern.\n");
   fprintf(stdout, "\t--command, -c: Input command.\n");
+  fprintf(stdout, "\t--file, -f: The input command is a file.\n");
   fprintf(stdout, "\t--hexa: Input command in hexa (by 2, eg for -c '00 00 10').\n");
   fprintf(stdout, "\t----------------\n");
   fprintf(stdout, "\t--simu, -s: Simulation file.\n");
@@ -105,7 +108,7 @@ void usage(int err) {
 
 
 int main(int argc, char** argv) {
-
+  _Bool file = 0;
   fprintf(stdout, "Basic serial sniffer is a FREE software v%d.%d.\nCopyright 2013 By kei\nLicense GPL.\n\n", BSS_VERSION_MAJOR, BSS_VERSION_MINOR);
 
   syssig_init(log_init_cast_user("bss", LOG_PID|LOG_CONS|LOG_PERROR), bss_cleanup);
@@ -115,7 +118,7 @@ int main(int argc, char** argv) {
   cmd = stringbuffer_new();
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0s:123", long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "hi:o:d:rc:0s:123f", long_options, NULL)) != -1) {
     switch (opt) {
       case 'h': usage(0); break;
       case 'i': /* input */
@@ -154,6 +157,9 @@ int main(int argc, char** argv) {
 	}
 	simul_mode = 1;
 	break;
+      case 'f': /* file */
+	file = 1;
+	break;
       case '1': /* snd */
 	snd = 1;
 	break;
@@ -175,16 +181,16 @@ int main(int argc, char** argv) {
     usage(EXIT_FAILURE);
   }
   if(simul_mode && rcv && snd) {
-    logger(LOG_ERR, "Invalid simul mode snd = 1 AND rcv = 1!");
+    logger(LOG_ERR, "Invalid simul mode snd = 1 AND rcv = 1!\n");
     usage(EXIT_FAILURE);
   }else if(simul_mode && !rcv && !snd) {
-    logger(LOG_ERR, "Invalid simul mode snd = 0 AND rcv = 0!");
+    logger(LOG_ERR, "Invalid simul mode snd = 0 AND rcv = 0!\n");
     usage(EXIT_FAILURE);
   } else if(simul_mode && osr) {
-    logger(LOG_ERR, "Invalid simul mode AND output mode!");
+    logger(LOG_ERR, "Invalid simul mode AND output mode!\n");
     usage(EXIT_FAILURE);
   } else if(simul_mode && stringbuffer_length(cmd)) {
-    logger(LOG_ERR, "Invalid simul mode AND non null command!");
+    logger(LOG_ERR, "Invalid simul mode AND non null command!\n");
     usage(EXIT_FAILURE);
   }
 
@@ -195,10 +201,31 @@ int main(int argc, char** argv) {
   sr_start_read(isr, bss_sr_read);
 
   if(stringbuffer_length(cmd)) {
+    char* bcmd = stringbuffer_to_str(cmd);
+    size_t blength = stringbuffer_length(cmd);
+    if(file) {
+      FILE* f = fopen(stringbuffer_to_str(cmd), "rb");
+      if(!f) {
+	logger(LOG_ERR, "Unable to open the file '%s': (%d) %s.\n", stringbuffer_to_str(cmd), errno, strerror(errno));
+	exit(EXIT_FAILURE);
+      }
+      off_t size = file_fsize(f);
+      char* buf = malloc(size);
+      if(!buf) {
+	fclose(f);
+	logger(LOG_ERR, "Unable to alloc the buffer memory.\n");
+	exit(EXIT_FAILURE);
+      }
+      bzero(buf, size);
+      fread(buf, 1, size, f);
+      fclose(f);
+      bcmd = buf;
+      blength = size;
+    }
     if(!hexa)
-      sr_write(isr, (unsigned char*)stringbuffer_to_str(cmd), stringbuffer_length(cmd));
+      sr_write(isr, (unsigned char*)bcmd, blength);
     else
-      bss_urils_send_frame(isr, stringbuffer_to_str(cmd));
+      bss_urils_send_frame(isr, bcmd);
   } else if(simul_mode) {
     bss_utils_parse_simul(&simul, &tsnd, &trcv, &cframes);
     if(snd)
