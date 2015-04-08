@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
     if(!hexa)
       sr_write(isr, (unsigned char*)bcmd, blength);
     else
-      bss_urils_send_frame(isr, bcmd);
+      bss_utils_send_frame(isr, bcmd);
     
   } else if(simul_mode) {
     bss_utils_parse_simul(&simul, &tsnd, &trcv, &cframes);

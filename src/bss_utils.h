@@ -83,11 +83,11 @@
   void bss_utils_send_table_frame(sr_t isr, htable_t t, uint32_t *tidx);
 
   /**
-   * @fn void bss_urils_send_frame(sr_t isr, char* cmd)
+   * @fn void bss_utils_send_frame(sr_t isr, char* cmd)
    * @brief Send the first frame.
    * @param isr Serial pointer.
    * @param cmd The command.
    */
-  void bss_urils_send_frame(sr_t isr, char* cmd);
+  void bss_utils_send_frame(sr_t isr, char* cmd);
 
 #endif /* __BSS_UTILS_H__ */

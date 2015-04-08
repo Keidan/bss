@@ -24,12 +24,12 @@
 #include "bss_utils.h"
 
 /**
- * @fn void bss_urils_send_frame(sr_t isr, char* cmd)
+ * @fn void bss_utils_send_frame(sr_t isr, char* cmd)
  * @brief Send the first frame.
  * @param isr Serial pointer.
  * @param cmd The command.
  */
-void bss_urils_send_frame(sr_t isr, char* cmd) {
+void bss_utils_send_frame(sr_t isr, char* cmd) {
   uint32_t n;
   unsigned char* buffer = bss_utils_hex_to_buffer_c(cmd, &n);
   printf("Send frame (%d bytes):\n", n);
@@ -51,7 +51,7 @@ void bss_utils_send_table_frame(sr_t isr, htable_t t, uint32_t *tidx) {
     logger(LOG_ERR, "Null frame cmd\n");
     return;
   }
-  bss_urils_send_frame(isr, cmd);
+  bss_utils_send_frame(isr, cmd);
   (*tidx)++;
 }
 
